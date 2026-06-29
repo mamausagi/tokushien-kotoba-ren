@@ -23,13 +23,16 @@
     --orange:#f0a868; --sky:#7bb6d8; --pink:#e89fbb; --purple:#b69fd8;
     --slot:#e7efea; --shadow:0 4px 0 rgba(0,0,0,.08),0 6px 16px rgba(0,0,0,.08);
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;
+    -webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;
+    -webkit-touch-callout:none;touch-action:manipulation}
   html,body{margin:0;height:100%}
   body{
     font-family:"Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
-    background:var(--bg);color:var(--ink);overflow:hidden;user-select:none;
+    background:var(--bg);color:var(--ink);overflow:hidden;
     display:flex;flex-direction:column;height:100dvh;
   }
+  button{font-family:inherit;-webkit-user-select:none;user-select:none}
   /* ---------- ヘッダー ---------- */
   header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--mint);color:#fff;flex:0 0 auto}
   #backBtn{width:auto;padding:6px 12px;border:none;background:rgba(255,255,255,.22);color:#fff;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;display:none}
@@ -318,13 +321,16 @@ function loadVoices(){voices=(speechSynthesis.getVoices()||[]).filter(v=>v.lang&
 if('speechSynthesis' in window){loadVoices();speechSynthesis.onvoiceschanged=loadVoices}
 function tts(text){return new Promise(res=>{
   if(!settings.sound || !('speechSynthesis' in window)){res();return}
-  speechSynthesis.cancel();
+  // iOS対策：cancel→speak の連続はしゃべらない事があるので、話中のときだけcancel。停止状態はresume
+  try{if(speechSynthesis.paused)speechSynthesis.resume()}catch(e){}
+  try{if(speechSynthesis.speaking)speechSynthesis.cancel()}catch(e){}
   const u=new SpeechSynthesisUtterance(text);u.lang="ja-JP";u.rate=settings.rate;u.pitch=1.1;
-  const v=voices.find(v=>v.name===settings.voice)||voices[0];if(v)u.voice=v;
+  const v=voices.find(v=>v.name===settings.voice)||voices.find(v=>v.lang&&v.lang.startsWith("ja"));if(v)u.voice=v;
   let done=false;const fin=()=>{if(done)return;done=true;clearTimeout(t);res()};
   // onend が来ない端末/環境でも必ず解決する保険（文字数から最大時間を見積もる）
   const t=setTimeout(fin,2000+text.length*350);
-  u.onend=fin;u.onerror=fin;speechSynthesis.speak(u);
+  u.onend=fin;u.onerror=fin;
+  try{speechSynthesis.speak(u)}catch(e){fin()}
 })}
 // iOS Safari 対策：再生要素は使い回し、最初のタップで「解除（unlock）」する。
 // new Audio() を毎回作る＋await後に play() するとユーザー操作が切れて再生がブロックされるため。
@@ -459,7 +465,7 @@ function celebrate(txt){
 
 /* ===================== 録音まわり（iOS Safari 対応） ===================== */
 const SELF_REC_MAX=6000;            // 自動停止（押し忘れ対策）
-let selfRecTimer=null, selfRecDog=null;
+let selfRecTimer=null, selfRecDog=null, selfRecInt=null;
 // 端末が録れる形式を選ぶ（Safari=mp4 / Chrome=webm）。webm固定だとSafariで再生できない
 function pickMime(){
   if(!(window.MediaRecorder&&MediaRecorder.isTypeSupported))return "";
@@ -467,7 +473,7 @@ function pickMime(){
   return "";
 }
 function newRecorder(stream){const m=pickMime();try{return m?new MediaRecorder(stream,{mimeType:m}):new MediaRecorder(stream)}catch(e){return new MediaRecorder(stream)}}
-function resetRecBtn(btn){btn.classList.remove("on");if(btn.dataset.lbl)btn.innerHTML=btn.dataset.lbl}
+function resetRecBtn(btn){clearInterval(selfRecInt);btn.classList.remove("on");if(btn.dataset.lbl)btn.innerHTML=btn.dataset.lbl}
 
 /* ===================== 子どもの録音（自分の声） ===================== */
 function toggleSelfRec(btn,done,targetWords){
@@ -486,7 +492,11 @@ function toggleSelfRec(btn,done,targetWords){
     };
     mediaRec.start();
     if(!btn.dataset.lbl)btn.dataset.lbl=btn.innerHTML;
-    btn.classList.add("on");btn.innerHTML="⏹ とめる";
+    btn.classList.add("on");
+    let left=Math.round(SELF_REC_MAX/1000);
+    btn.innerHTML="⏹ とめる ("+left+")";
+    clearInterval(selfRecInt);
+    selfRecInt=setInterval(()=>{left--;if(left>0&&mediaRec&&mediaRec.state==="recording")btn.innerHTML="⏹ とめる ("+left+")"},1000);
     // 音声認識は iOS Safari でマイク競合 → 既定オフ（おとなモードで任意ON）
     if(settings.recognize&&recogSupported&&targetWords)startRecog(targetWords);
     selfRecTimer=setTimeout(()=>{if(mediaRec&&mediaRec.state==="recording"){try{mediaRec.stop()}catch(e){}}},SELF_REC_MAX);
@@ -548,9 +558,8 @@ $("#quizListen").onclick=()=>tts(QUIZ[quizIdx].qText);
 $("#quizNext").onclick=()=>loadQuiz(quizIdx+1);
 
 /* ===================== おとなモード ===================== */
-let pressT=null;
-$("#gear").addEventListener("pointerdown",()=>{pressT=setTimeout(openGate,800)});
-["pointerup","pointerleave","pointercancel"].forEach(ev=>$("#gear").addEventListener(ev,()=>clearTimeout(pressT)));
+// 長押しは iOS で不安定 → タップで開く。子ども対策は「⭐3回」ゲートで担保
+$("#gear").addEventListener("click",openGate);
 function openGate(){
   const panel=$("#adminPanel");
   panel.innerHTML=`<h2>おとなのかた かくにん</h2><p class="hidenote" style="text-align:center">⭐を 3かい タップ</p><div class="gate" id="gate"><button>⭐</button><button>⭐</button><button>⭐</button></div>`;
