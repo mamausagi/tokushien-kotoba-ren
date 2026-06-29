@@ -326,13 +326,39 @@ function tts(text){return new Promise(res=>{
   const t=setTimeout(fin,2000+text.length*350);
   u.onend=fin;u.onerror=fin;speechSynthesis.speak(u);
 })}
-let curAudio=null;
-function playBlob(blob){return new Promise(res=>{
-  if(!settings.sound){res();return}
-  const url=URL.createObjectURL(blob);const a=new Audio(url);curAudio=a;
-  a.onended=()=>{URL.revokeObjectURL(url);res()};a.onerror=()=>res();
-  a.play().catch(()=>res());
+// iOS Safari 対策：再生要素は使い回し、最初のタップで「解除（unlock）」する。
+// new Audio() を毎回作る＋await後に play() するとユーザー操作が切れて再生がブロックされるため。
+const player=new Audio();player.setAttribute("playsinline","");
+let audioUnlocked=false, lastObjURL=null;
+function silentWavURI(){
+  const sr=8000,n=200,bytes=44+n,buf=new Uint8Array(bytes),dv=new DataView(buf.buffer);
+  const s=(o,str)=>{for(let i=0;i<str.length;i++)buf[o+i]=str.charCodeAt(i)};
+  s(0,"RIFF");dv.setUint32(4,36+n,true);s(8,"WAVE");s(12,"fmt ");dv.setUint32(16,16,true);
+  dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,sr,true);dv.setUint32(28,sr,true);
+  dv.setUint16(32,1,true);dv.setUint16(34,8,true);s(36,"data");dv.setUint32(40,n,true);
+  for(let i=0;i<n;i++)buf[44+i]=128;
+  let bin="";for(let i=0;i<bytes;i++)bin+=String.fromCharCode(buf[i]);
+  return "data:audio/wav;base64,"+btoa(bin);
+}
+function unlockAudio(){
+  if(audioUnlocked)return;
+  audioUnlocked=true;   // 1回のジェスチャーで解除。以後は再試行せず＝再生中の音を妨げない
+  try{player.muted=true;player.src=silentWavURI();const p=player.play();
+    const fin=()=>{player.pause();try{player.currentTime=0}catch(e){}player.muted=false};
+    if(p&&p.then)p.then(fin).catch(()=>{player.muted=false}); else fin();
+  }catch(e){player.muted=false}
+}
+["pointerdown","touchend","click"].forEach(ev=>window.addEventListener(ev,unlockAudio,{passive:true}));
+function playURL(url){return new Promise(res=>{
+  if(!settings.sound||!url){res();return}
+  player.onended=()=>res();player.onerror=()=>res();
+  try{player.muted=false;player.src=url;const p=player.play();if(p&&p.catch)p.catch(()=>res())}catch(e){res()}
 })}
+function playBlob(blob){
+  if(lastObjURL){URL.revokeObjectURL(lastObjURL);lastObjURL=null}
+  lastObjURL=URL.createObjectURL(blob);
+  return playURL(lastObjURL);
+}
 async function playWord(word){
   if(activeVoice!=="tts"){const k=vkey(activeVoice,word);if(audioKeys.has(k)){const b=await DB.get(k);if(b){await playBlob(b);return}}}
   await tts(word);
@@ -448,7 +474,7 @@ function toggleSelfRec(btn,done,targetWords){
     selfRecDog=setTimeout(()=>resetRecBtn(btn),SELF_REC_MAX+2000); // onstopが来なくても必ず戻す
   }).catch(()=>{toast("マイクが つかえません（きょかを かくにん）");resetRecBtn(btn)});
 }
-function playSelf(){if(lastRecURL){const a=new Audio(lastRecURL);a.play()}}
+function playSelf(){if(lastRecURL)playURL(lastRecURL)}
 function startRecog(targetWords){
   if(!recogSupported)return;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
