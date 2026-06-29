@@ -275,7 +275,7 @@ const QUIZ = [
 
 /* ===================== 状態 ===================== */
 let level = 0, filled = [];
-let settings = load("kotoba_settings", {sound:true, rate:0.85, voice:""});
+let settings = load("kotoba_settings", {sound:true, rate:0.85, voice:"", recognize:false});
 let custom   = load("kotoba_custom", {agent:[],object:[],verb:[],adj:[]});
 let profiles = load2("kotoba_profiles", [{id:"tts",name:"きかい",emoji:"🤖"}]);
 let activeVoice = localStorage.getItem("kotoba_activeVoice") || "tts";
@@ -412,16 +412,41 @@ function celebrate(txt){
   setTimeout(()=>el.classList.remove("show"),1500);
 }
 
-/* ===================== 子どもの録音（自分の声）＋ 認識 ===================== */
+/* ===================== 録音まわり（iOS Safari 対応） ===================== */
+const SELF_REC_MAX=6000;            // 自動停止（押し忘れ対策）
+let selfRecTimer=null, selfRecDog=null;
+// 端末が録れる形式を選ぶ（Safari=mp4 / Chrome=webm）。webm固定だとSafariで再生できない
+function pickMime(){
+  if(!(window.MediaRecorder&&MediaRecorder.isTypeSupported))return "";
+  for(const m of ["audio/mp4","audio/webm;codecs=opus","audio/webm","audio/aac"]){if(MediaRecorder.isTypeSupported(m))return m}
+  return "";
+}
+function newRecorder(stream){const m=pickMime();try{return m?new MediaRecorder(stream,{mimeType:m}):new MediaRecorder(stream)}catch(e){return new MediaRecorder(stream)}}
+function resetRecBtn(btn){btn.classList.remove("on");if(btn.dataset.lbl)btn.innerHTML=btn.dataset.lbl}
+
+/* ===================== 子どもの録音（自分の声） ===================== */
 function toggleSelfRec(btn,done,targetWords){
-  if(mediaRec&&mediaRec.state==="recording"){if(mediaRec)mediaRec.stop();if(recog)try{recog.stop()}catch(e){}return}
+  if(mediaRec&&mediaRec.state==="recording"){try{mediaRec.stop()}catch(e){}if(recog){try{recog.stop()}catch(e){}}return}
+  if(!(navigator.mediaDevices&&window.MediaRecorder)){toast("この ブラウザは ろくおんに たいおうしていません");return}
   navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
-    recChunks=[];mediaRec=new MediaRecorder(stream);
-    mediaRec.ondataavailable=e=>recChunks.push(e.data);
-    mediaRec.onstop=()=>{const blob=new Blob(recChunks,{type:'audio/webm'});if(lastRecURL)URL.revokeObjectURL(lastRecURL);lastRecURL=URL.createObjectURL(blob);stream.getTracks().forEach(t=>t.stop());btn.classList.remove("on");btn.innerHTML=btn.dataset.lbl;done&&done()};
-    mediaRec.start();btn.dataset.lbl=btn.innerHTML;btn.classList.add("on");btn.innerHTML="⏹ とめる";
-    if(targetWords)startRecog(targetWords);
-  }).catch(()=>toast("マイクが つかえません"));
+    recChunks=[];mediaRec=newRecorder(stream);
+    mediaRec.ondataavailable=e=>{if(e.data&&e.data.size)recChunks.push(e.data)};
+    mediaRec.onstop=()=>{
+      clearTimeout(selfRecTimer);clearTimeout(selfRecDog);
+      const type=mediaRec.mimeType||"audio/mp4";
+      if(lastRecURL)URL.revokeObjectURL(lastRecURL);
+      lastRecURL=recChunks.length?URL.createObjectURL(new Blob(recChunks,{type})):null;
+      stream.getTracks().forEach(t=>t.stop());
+      resetRecBtn(btn);done&&done();
+    };
+    mediaRec.start();
+    if(!btn.dataset.lbl)btn.dataset.lbl=btn.innerHTML;
+    btn.classList.add("on");btn.innerHTML="⏹ とめる";
+    // 音声認識は iOS Safari でマイク競合 → 既定オフ（おとなモードで任意ON）
+    if(settings.recognize&&recogSupported&&targetWords)startRecog(targetWords);
+    selfRecTimer=setTimeout(()=>{if(mediaRec&&mediaRec.state==="recording"){try{mediaRec.stop()}catch(e){}}},SELF_REC_MAX);
+    selfRecDog=setTimeout(()=>resetRecBtn(btn),SELF_REC_MAX+2000); // onstopが来なくても必ず戻す
+  }).catch(()=>{toast("マイクが つかえません（きょかを かくにん）");resetRecBtn(btn)});
 }
 function playSelf(){if(lastRecURL){const a=new Audio(lastRecURL);a.play()}}
 function startRecog(targetWords){
@@ -492,6 +517,7 @@ function openAdmin(){
   panel.innerHTML=`
     <h2>⚙️ おとなモード</h2>
     <div class="row"><label>おとを ならす</label><button class="switch ${settings.sound?'on':''}" id="swSound"></button></div>
+    <div class="row"><label>こえを ききとって ほめる<br><span class="hidenote">iPhone/iPad では ふあんてい・録音と競合します。Android向け（既定オフ）</span></label><button class="switch ${settings.recognize?'on':''}" id="swRecog"></button></div>
     <div class="row"><label>きかい声の はやさ</label><input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="${settings.rate}"></div>
     <div class="row"><label>きかい声</label><select id="voiceSel"></select></div>
 
@@ -510,6 +536,7 @@ function openAdmin(){
     <input type="file" id="photoFile" accept="image/*" capture="environment" style="display:none">`;
 
   $("#swSound").onclick=function(){settings.sound=!settings.sound;this.classList.toggle("on");save("kotoba_settings",settings)};
+  $("#swRecog").onclick=function(){settings.recognize=!settings.recognize;this.classList.toggle("on");save("kotoba_settings",settings)};
   $("#rate").oninput=e=>{settings.rate=+e.target.value;save("kotoba_settings",settings)};
   const vs=$("#voiceSel");vs.innerHTML="";voices.forEach(v=>{const o=document.createElement("option");o.value=v.name;o.textContent=v.name;if(v.name===settings.voice)o.selected=true;vs.appendChild(o)});if(!voices.length)vs.innerHTML="<option>（じどう）</option>";
   vs.onchange=e=>{settings.voice=e.target.value;save("kotoba_settings",settings)};
@@ -574,15 +601,24 @@ function newProfile(done){
 
 /* 1単語ずつ録音（おとなモード用） */
 function recordWord(pid,word,btn,done){
-  if(mediaRec&&mediaRec.state==="recording"){mediaRec.stop();return}
+  if(mediaRec&&mediaRec.state==="recording"){try{mediaRec.stop()}catch(e){}return}
+  if(!(navigator.mediaDevices&&window.MediaRecorder)){toast("ろくおんに たいおうしていません");return}
   navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
-    recChunks=[];mediaRec=new MediaRecorder(stream);
-    mediaRec.ondataavailable=e=>recChunks.push(e.data);
-    mediaRec.onstop=async()=>{const blob=new Blob(recChunks,{type:'audio/webm'});stream.getTracks().forEach(t=>t.stop());btn.classList.remove("recing");await DB.put(vkey(pid,word),blob);await refreshKeys();done&&done()};
+    recChunks=[];mediaRec=newRecorder(stream);
+    mediaRec.ondataavailable=e=>{if(e.data&&e.data.size)recChunks.push(e.data)};
+    mediaRec.onstop=async()=>{
+      clearTimeout(selfRecTimer);clearTimeout(selfRecDog);
+      const type=mediaRec.mimeType||"audio/mp4";
+      const blob=new Blob(recChunks,{type});
+      stream.getTracks().forEach(t=>t.stop());btn.classList.remove("recing");
+      if(blob.size){await DB.put(vkey(pid,word),blob);await refreshKeys()}
+      done&&done();
+    };
     mediaRec.start();btn.classList.add("recing");
-    // しゃべる時間：タップで止める or 4秒で自動
-    setTimeout(()=>{if(mediaRec&&mediaRec.state==="recording")mediaRec.stop()},4000);
-  }).catch(()=>toast("マイクが つかえません"));
+    // タップで止める or 4秒で自動。onstopが来なくてもボタンは戻す
+    selfRecTimer=setTimeout(()=>{if(mediaRec&&mediaRec.state==="recording"){try{mediaRec.stop()}catch(e){}}},4000);
+    selfRecDog=setTimeout(()=>btn.classList.remove("recing"),6000);
+  }).catch(()=>{toast("マイクが つかえません");btn.classList.remove("recing")});
 }
 
 /* ===================== トースト ===================== */
