@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#7bc4a4">
+<title>ことばれんしゅう</title>
+
+<!-- ===== PWA設定（ホーム画面アイコン対応） ===== -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<!-- iOS Safari 用 -->
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ことばれんしゅう">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<!-- 検索エンジン除外 -->
+<meta name="robots" content="noindex, nofollow, noarchive">
+<style>
+  :root{
+    --bg:#f3f7f4; --card:#ffffff; --ink:#3a4a44; --mint:#7bc4a4; --mint-d:#5fae8c;
+    --orange:#f0a868; --sky:#7bb6d8; --pink:#e89fbb; --purple:#b69fd8;
+    --slot:#e7efea; --shadow:0 4px 0 rgba(0,0,0,.08),0 6px 16px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);overflow:hidden;user-select:none;
+    display:flex;flex-direction:column;height:100dvh;
+  }
+  /* ---------- ヘッダー ---------- */
+  header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--mint);color:#fff;flex:0 0 auto}
+  #backBtn{width:auto;padding:6px 12px;border:none;background:rgba(255,255,255,.22);color:#fff;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;display:none}
+  header h1{font-size:18px;margin:0;font-weight:800;letter-spacing:1px}
+  .reward{margin-left:auto;display:flex;align-items:center;gap:8px;font-weight:800}
+  .reward .pill{background:rgba(255,255,255,.25);border-radius:999px;padding:4px 12px;font-size:15px}
+  .voicechip{background:rgba(255,255,255,.25);border-radius:999px;padding:4px 10px;font-size:15px;font-weight:800;border:none;color:#fff;cursor:pointer}
+  #gear{width:40px;height:40px;border:none;background:rgba(255,255,255,.2);color:#fff;border-radius:12px;font-size:20px;cursor:pointer;flex:0 0 auto}
+  /* ---------- 画面 ---------- */
+  .screen{display:none;flex:1 1 auto;min-height:0;flex-direction:column}
+  .screen.active{display:flex}
+  /* ---------- ホーム ---------- */
+  #home{align-items:center;justify-content:flex-start;overflow-y:auto;padding:14px}
+  .voicepick{width:100%;max-width:520px;background:#fff;border-radius:20px;box-shadow:var(--shadow);padding:12px;margin-bottom:14px}
+  .voicepick .t{font-size:14px;font-weight:800;color:#8aa39a;margin:2px 4px 8px}
+  .vrow{display:flex;gap:8px;flex-wrap:wrap}
+  .vbtn{flex:0 0 auto;border:3px solid #eef3f0;background:#fff;border-radius:16px;padding:8px 12px;font-size:16px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px}
+  .vbtn .em{font-size:26px}
+  .vbtn.on{border-color:var(--mint);background:#eef8f3}
+  .modes{display:grid;grid-template-columns:1fr;gap:14px;width:100%;max-width:520px}
+  .mode{border:none;border-radius:24px;padding:22px;font-size:24px;font-weight:800;color:#fff;box-shadow:var(--shadow);cursor:pointer;display:flex;align-items:center;gap:16px;text-align:left}
+  .mode .ic{font-size:48px;line-height:1}
+  .mode small{display:block;font-size:14px;font-weight:700;opacity:.92;margin-top:4px}
+  .mode.build{background:var(--mint)}
+  .mode.mane{background:var(--sky)}
+  .mode.quiz{background:var(--purple)}
+  /* ---------- レベル帯 ---------- */
+  .levels{display:flex;gap:6px;padding:8px 12px 4px;overflow-x:auto;flex:0 0 auto}
+  .lv{flex:0 0 auto;border:none;border-radius:14px;padding:8px 12px;font-size:14px;font-weight:800;background:#fff;color:var(--ink);box-shadow:var(--shadow);cursor:pointer;white-space:nowrap}
+  .lv.active{background:var(--orange);color:#fff}
+  /* ---------- 文スロット ---------- */
+  .stage{flex:0 0 auto;padding:10px 12px 4px}
+  .slots{display:flex;gap:10px;justify-content:center;align-items:stretch;flex-wrap:wrap}
+  .slot{flex:1 1 0;max-width:150px;min-width:96px;min-height:120px;background:var(--slot);border:4px dashed #c7d6cf;border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;transition:.15s}
+  .slot.active{border-color:var(--orange);background:#fff7ee;animation:pulse 1.2s infinite}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+  .slot.filled{border-style:solid;border-color:transparent;background:#fff;box-shadow:var(--shadow)}
+  .slot.ro{cursor:default}
+  .slot .emoji{font-size:54px;line-height:1}
+  .slot img{width:64px;height:64px;object-fit:cover;border-radius:12px}
+  .slot .word{font-size:22px;font-weight:800;margin-top:2px}
+  .slot .hint{font-size:14px;color:#9bb0a8;font-weight:800}
+  .slot .x{position:absolute;top:-8px;right:-8px;width:30px;height:30px;border-radius:50%;background:#f08080;color:#fff;border:none;font-size:18px;font-weight:800;display:none;cursor:pointer}
+  .slot.filled .x{display:block}
+  .slot.ro .x{display:none}
+  .slot .role{position:absolute;top:6px;left:10px;font-size:12px;font-weight:800;opacity:.6}
+  /* ---------- 操作バー ---------- */
+  .actions{display:flex;gap:8px;justify-content:center;padding:6px 12px;flex:0 0 auto;flex-wrap:wrap}
+  .act{border:none;border-radius:16px;padding:12px 16px;font-size:17px;font-weight:800;color:#fff;box-shadow:var(--shadow);cursor:pointer;display:flex;align-items:center;gap:6px}
+  .act:disabled{opacity:.4;cursor:default;box-shadow:none}
+  .act.read{background:var(--mint)}
+  .act.rec{background:var(--pink)}
+  .act.play{background:var(--sky)}
+  .act.clear{background:#c7b8a8}
+  .act.next{background:var(--orange)}
+  .act.big{font-size:20px;padding:16px 22px}
+  .act.rec.on{animation:blink .8s infinite}
+  @keyframes blink{50%{background:#ff6b8a}}
+  /* ---------- カードパレット ---------- */
+  .palette-wrap{flex:1 1 auto;overflow-y:auto;padding:6px 12px 16px;min-height:0}
+  .cat-label{font-size:14px;font-weight:800;color:#8aa39a;margin:6px 4px;text-align:center}
+  .palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+  .pcard{background:var(--card);border:3px solid #eef3f0;border-radius:18px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;cursor:pointer;box-shadow:var(--shadow);transition:transform .08s}
+  .pcard:active{transform:scale(.92)}
+  .pcard .emoji{font-size:42px;line-height:1}
+  .pcard img{width:46px;height:46px;object-fit:cover;border-radius:10px}
+  .pcard .word{font-size:16px;font-weight:800;margin-top:2px}
+  /* ---------- まねっこ / しつもん ---------- */
+  .midbox{flex:1 1 auto;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:14px;text-align:center}
+  .speech{background:#fff;border-radius:22px;box-shadow:var(--shadow);padding:14px 18px;font-size:22px;font-weight:800;max-width:90%}
+  .speech.q{background:var(--purple);color:#fff}
+  /* ---------- お祝い ---------- */
+  #celebrate{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(123,196,164,.92);z-index:40;color:#fff}
+  #celebrate.show{display:flex;animation:pop .3s}
+  @keyframes pop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+  #celebrate .big{font-size:90px}
+  #celebrate .txt{font-size:34px;font-weight:800;margin-top:8px}
+  .confetti{position:fixed;top:-20px;font-size:28px;z-index:41;pointer-events:none;animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(110vh) rotate(360deg);opacity:.7}}
+  /* ---------- おとなモード ---------- */
+  #admin{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  #admin.show{display:flex}
+  .panel{background:#fff;border-radius:22px;padding:20px;max-width:460px;width:100%;max-height:90vh;overflow:auto}
+  .panel h2{margin:0 0 12px;font-size:20px}
+  .panel h3{margin:16px 0 6px;font-size:16px;color:var(--mint-d)}
+  .row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #eef3f0;gap:10px}
+  .row label{font-weight:800;font-size:15px}
+  .switch{width:56px;height:32px;border-radius:999px;background:#d7e0db;position:relative;border:none;cursor:pointer;flex:0 0 auto}
+  .switch.on{background:var(--mint)}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:.2s}
+  .switch.on::after{left:27px}
+  .panel input[type=range]{width:150px}
+  .panel select{font-size:15px;padding:6px;border-radius:10px;border:2px solid #eef3f0}
+  .panel .btn{border:none;border-radius:14px;padding:12px 16px;font-weight:800;font-size:16px;cursor:pointer;width:100%;margin-top:8px}
+  .panel .btn.close{background:var(--mint);color:#fff}
+  .panel .btn.danger{background:#f3e2e2;color:#c25b5b}
+  .panel .btn.sky{background:var(--sky);color:#fff}
+  .gate{display:flex;gap:8px;justify-content:center;margin:10px 0}
+  .gate button{width:60px;height:60px;border-radius:16px;border:none;background:var(--slot);font-size:24px;font-weight:800;cursor:pointer}
+  .hidenote{font-size:13px;color:#9bb0a8}
+  /* 声録音グリッド */
+  .vlist{max-height:46vh;overflow:auto;border:1px solid #eef3f0;border-radius:14px}
+  .vitem{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f2f6f4}
+  .vitem .em{font-size:24px}
+  .vitem .w{font-weight:800;flex:1 1 auto}
+  .vitem .mark{font-size:18px;width:24px;text-align:center}
+  .vitem button{border:none;border-radius:10px;width:40px;height:40px;font-size:18px;cursor:pointer;background:var(--slot)}
+  .vitem button.recing{background:#ff6b8a;color:#fff;animation:blink .8s infinite}
+  .vitem button.has{background:#dff1e8}
+  .pemoji{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+  .pemoji button{width:46px;height:46px;border-radius:12px;border:2px solid #eef3f0;background:#fff;font-size:24px;cursor:pointer}
+  .pemoji button.sel{border-color:var(--mint);background:#eef8f3}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-weight:800;z-index:60;opacity:0;transition:.3s;text-align:center;max-width:90vw}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <button id="backBtn">← おうち</button>
+  <h1 id="screenTitle">ことばれんしゅう</h1>
+  <div class="reward">
+    <button class="voicechip" id="voiceChip">🤖 きかい</button>
+    <span class="pill">⭐ <span id="stars">0</span></span>
+  </div>
+  <button id="gear" title="おとな">⚙️</button>
+</header>
+
+<!-- ============ ホーム ============ -->
+<section class="screen active" id="home">
+  <div class="voicepick">
+    <div class="t">だれの こえで あそぶ？</div>
+    <div class="vrow" id="voiceRow"></div>
+  </div>
+  <div class="modes">
+    <button class="mode build" data-go="build"><span class="ic">🧩</span><span>ことばを つくろう<small>カードを ならべて ぶんを つくる</small></span></button>
+    <button class="mode mane" data-go="mane"><span class="ic">🦜</span><span>まねっこ<small>おてほんを きいて まねしよう</small></span></button>
+    <button class="mode quiz" data-go="quiz"><span class="ic">💬</span><span>しつもん あそび<small>しつもんに えで こたえよう</small></span></button>
+  </div>
+</section>
+
+<!-- ============ ことばをつくろう ============ -->
+<section class="screen" id="build">
+  <div class="levels" id="levels"></div>
+  <div class="stage"><div class="slots" id="slots"></div></div>
+  <div class="actions">
+    <button class="act read" id="readBtn" disabled>🔊 よむ</button>
+    <button class="act rec"  id="recBtn"  disabled>🎤 ろくおん</button>
+    <button class="act play" id="playBtn" disabled>▶️ じぶんのこえ</button>
+    <button class="act clear" id="clearBtn" disabled>🧹 けす</button>
+  </div>
+  <div class="palette-wrap">
+    <div class="cat-label" id="catLabel"></div>
+    <div class="palette" id="palette"></div>
+  </div>
+</section>
+
+<!-- ============ まねっこ ============ -->
+<section class="screen" id="mane">
+  <div class="stage"><div class="slots" id="maneSlots"></div></div>
+  <div class="midbox">
+    <div class="speech" id="maneText">…</div>
+    <div class="actions">
+      <button class="act read big" id="maneListen">🔊 きいて</button>
+      <button class="act rec big"  id="maneRec">🎤 まねする</button>
+      <button class="act play" id="manePlay" disabled>▶️ きく</button>
+    </div>
+    <button class="act next" id="maneNext">つぎ ▶</button>
+  </div>
+</section>
+
+<!-- ============ しつもんあそび ============ -->
+<section class="screen" id="quiz">
+  <div class="midbox" style="justify-content:flex-start">
+    <div class="speech q" id="quizQ">…</div>
+    <button class="act read big" id="quizListen">🔊 もういちど</button>
+    <div class="palette" id="quizOptions" style="width:100%;max-width:520px"></div>
+    <div class="speech" id="quizA" style="display:none"></div>
+    <button class="act next" id="quizNext" style="display:none">つぎ ▶</button>
+  </div>
+</section>
+
+<!-- お祝い -->
+<div id="celebrate"><div class="big">🎉</div><div class="txt">よめたね！</div></div>
+<!-- おとなモード -->
+<div id="admin"><div class="panel" id="adminPanel"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== データ ===================== */
+const CARDS = {
+  agent:[
+    {w:"わんわん",e:"🐶"},{w:"ねこ",e:"🐱"},{w:"ぞうさん",e:"🐘"},{w:"うさぎ",e:"🐰"},
+    {w:"あかちゃん",e:"👶"},{w:"ぼく",e:"👦"},{w:"わたし",e:"👧"},{w:"ことり",e:"🐦"},
+  ],
+  object:[
+    {w:"りんご",e:"🍎"},{w:"ジュース",e:"🧃"},{w:"パン",e:"🍞"},{w:"みず",e:"💧"},
+    {w:"ボール",e:"⚽"},{w:"ほん",e:"📖"},{w:"バナナ",e:"🍌"},{w:"おにぎり",e:"🍙"},
+    {w:"でんしゃ",e:"🚃"},{w:"おはな",e:"🌷"},{w:"くるま",e:"🚗"},{w:"くつ",e:"👟"},
+  ],
+  verb:[
+    {w:"たべる",e:"😋"},{w:"のむ",e:"🥤"},{w:"ねる",e:"😴"},{w:"あらう",e:"🧼"},
+    {w:"よむ",e:"📖"},{w:"はしる",e:"🏃"},{w:"とぶ",e:"🦋"},{w:"みる",e:"👀"},
+    {w:"なげる",e:"🤾"},{w:"わらう",e:"😄"},{w:"なく",e:"😢"},
+  ],
+  adj:[
+    {w:"あかい",e:"🔴"},{w:"あおい",e:"🔵"},{w:"きいろい",e:"🟡"},{w:"おおきい",e:"🐘"},
+    {w:"ちいさい",e:"🐜"},{w:"あまい",e:"🍬"},{w:"まるい",e:"⚪"},
+  ],
+};
+const ROLE_JP = {agent:"だれ・なに",object:"なに",verb:"どうする",adj:"どんな"};
+const ROLE_PARTICLE = {agent:"が",object:"を",adj:"",verb:""};
+
+const LEVELS = [
+  {name:"Lv1 なに＋どうする", slots:["object","verb"]},
+  {name:"Lv2 だれ＋どうする", slots:["agent","verb"]},
+  {name:"Lv3 どんな＋なに",   slots:["adj","object"]},
+  {name:"Lv4 3つのことば",    slots:["agent","object","verb"]},
+];
+
+// まねっこ お手本
+const MANE = [
+  {words:["りんご","たべる"], roles:["object","verb"]},
+  {words:["ジュース","のむ"], roles:["object","verb"]},
+  {words:["わんわん","ねる"], roles:["agent","verb"]},
+  {words:["ねこ","はしる"],   roles:["agent","verb"]},
+  {words:["あかい","くるま"], roles:["adj","object"]},
+  {words:["ちいさい","ことり"],roles:["adj","agent"]},
+  {words:["パン","たべる"],   roles:["object","verb"]},
+  {words:["ぞうさん","みず","のむ"], roles:["agent","object","verb"]},
+  {words:["あかちゃん","ねる"],roles:["agent","verb"]},
+  {words:["ほん","よむ"],     roles:["object","verb"]},
+];
+
+// しつもんあそび
+const QUIZ = [
+  {qText:"なにを たべる？", role:"object", verb:"たべる", options:["りんご","パン","バナナ","おにぎり"]},
+  {qText:"なにを のむ？",   role:"object", verb:"のむ",   options:["ジュース","みず"]},
+  {qText:"だれが ねんね？", role:"agent",  verb:"ねる",   options:["わんわん","ねこ","あかちゃん","うさぎ"]},
+  {qText:"なにを みる？",   role:"object", verb:"みる",   options:["ほん","でんしゃ","おはな"]},
+  {qText:"だれが はしる？", role:"agent",  verb:"はしる", options:["わんわん","ねこ","ぞうさん","ことり"]},
+];
+
+/* ===================== 状態 ===================== */
+let level = 0, filled = [];
+let settings = load("kotoba_settings", {sound:true, rate:0.85, voice:""});
+let custom   = load("kotoba_custom", {agent:[],object:[],verb:[],adj:[]});
+let profiles = load2("kotoba_profiles", [{id:"tts",name:"きかい",emoji:"🤖"}]);
+let activeVoice = localStorage.getItem("kotoba_activeVoice") || "tts";
+let audioKeys = new Set();           // IndexedDBに録音済みの key 集合
+let lastRecURL = null, mediaRec = null, recChunks = [], recTarget = null;
+let recog = null, recogSupported = ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+let curScreen = "home";
+
+/* ===================== 永続化 ===================== */
+function load(k,d){try{return {...d,...JSON.parse(localStorage.getItem(k))}}catch(e){return d}}
+function load2(k,d){try{const v=JSON.parse(localStorage.getItem(k));return Array.isArray(v)&&v.length?v:d}catch(e){return d}}
+function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function getStars(){return +(localStorage.getItem("kotoba_stars")||0)}
+function setStars(n){localStorage.setItem("kotoba_stars",n);$("#stars").textContent=n}
+function getToday(){let t=load("kotoba_today",{date:"",n:0});const d=new Date().toISOString().slice(0,10);if(t.date!==d){t={date:d,n:0};save("kotoba_today",t)}return t}
+function bumpToday(){let t=getToday();t.n++;save("kotoba_today",t)}
+
+/* ===================== IndexedDB（音声） ===================== */
+const DB={_p:null,
+  open(){return this._p||(this._p=new Promise((res,rej)=>{const r=indexedDB.open("kotoba_audio",1);r.onupgradeneeded=()=>r.result.createObjectStore("a");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}))},
+  async put(k,b){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction("a","readwrite");t.objectStore("a").put(b,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})},
+  async get(k){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction("a","readonly");const q=t.objectStore("a").get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
+  async del(k){const db=await this.open();return new Promise((res)=>{const t=db.transaction("a","readwrite");t.objectStore("a").delete(k);t.oncomplete=()=>res()})},
+  async keys(){const db=await this.open();return new Promise((res)=>{const t=db.transaction("a","readonly");const q=t.objectStore("a").getAllKeys();q.onsuccess=()=>res(q.result||[])})},
+};
+async function refreshKeys(){try{audioKeys=new Set(await DB.keys())}catch(e){audioKeys=new Set()}}
+const vkey=(pid,word)=>pid+"|"+word;
+
+/* ===================== ユーティリティ ===================== */
+const $=s=>document.querySelector(s);
+function cardsFor(role){return [...(CARDS[role]||[]), ...(custom[role]||[])]}
+function allVocab(){const seen={},out=[];["agent","object","verb","adj"].forEach(r=>cardsFor(r).forEach(c=>{if(!seen[c.w]){seen[c.w]=1;out.push({...c,role:r})}}));return out}
+function findCard(w){return allVocab().find(c=>c.w===w)||{w,e:"🔵"}}
+function activeProfile(){return profiles.find(p=>p.id===activeVoice)||profiles[0]}
+function joinSentence(words,roles){return words.map((w,i)=>w+(ROLE_PARTICLE[roles[i]]||"")).join("")}
+
+/* ===================== 音声再生（録音優先→TTS） ===================== */
+let voices=[];
+function loadVoices(){voices=(speechSynthesis.getVoices()||[]).filter(v=>v.lang&&v.lang.startsWith("ja"))}
+if('speechSynthesis' in window){loadVoices();speechSynthesis.onvoiceschanged=loadVoices}
+function tts(text){return new Promise(res=>{
+  if(!settings.sound || !('speechSynthesis' in window)){res();return}
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);u.lang="ja-JP";u.rate=settings.rate;u.pitch=1.1;
+  const v=voices.find(v=>v.name===settings.voice)||voices[0];if(v)u.voice=v;
+  let done=false;const fin=()=>{if(done)return;done=true;clearTimeout(t);res()};
+  // onend が来ない端末/環境でも必ず解決する保険（文字数から最大時間を見積もる）
+  const t=setTimeout(fin,2000+text.length*350);
+  u.onend=fin;u.onerror=fin;speechSynthesis.speak(u);
+})}
+let curAudio=null;
+function playBlob(blob){return new Promise(res=>{
+  if(!settings.sound){res();return}
+  const url=URL.createObjectURL(blob);const a=new Audio(url);curAudio=a;
+  a.onended=()=>{URL.revokeObjectURL(url);res()};a.onerror=()=>res();
+  a.play().catch(()=>res());
+})}
+async function playWord(word){
+  if(activeVoice!=="tts"){const k=vkey(activeVoice,word);if(audioKeys.has(k)){const b=await DB.get(k);if(b){await playBlob(b);return}}}
+  await tts(word);
+}
+async function playSequence(words){for(const w of words){await playWord(w)}}
+// 文を読む：きかい声は助詞つき自然文、家族の声は単語ごと（録音優先）
+async function playPhrase(words,roles){
+  if(activeVoice==="tts"){await tts(joinSentence(words,roles))}
+  else{await playSequence(words)}
+}
+function updateVoiceChip(){const p=activeProfile();$("#voiceChip").textContent=p.emoji+" "+p.name}
+
+/* ===================== 画面ルーター ===================== */
+const TITLES={home:"ことばれんしゅう",build:"ことばを つくろう",mane:"まねっこ",quiz:"しつもん あそび"};
+function showScreen(id){
+  curScreen=id;
+  document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("active",s.id===id));
+  $("#screenTitle").textContent=TITLES[id];
+  $("#backBtn").style.display = id==="home" ? "none" : "block";
+  if(id==="build")resetSlots();
+  if(id==="mane")loadMane(0);
+  if(id==="quiz")loadQuiz(0);
+}
+$("#backBtn").onclick=()=>showScreen("home");
+document.querySelectorAll(".mode").forEach(b=>b.onclick=()=>showScreen(b.dataset.go));
+
+/* ===================== ホーム：声チェンジャー ===================== */
+function renderVoiceRow(){
+  const row=$("#voiceRow");row.innerHTML="";
+  profiles.forEach(p=>{
+    const b=document.createElement("button");
+    b.className="vbtn"+(p.id===activeVoice?" on":"");
+    b.innerHTML=`<span class="em">${p.emoji}</span>${p.name}`;
+    b.onclick=()=>{activeVoice=p.id;localStorage.setItem("kotoba_activeVoice",p.id);renderVoiceRow();updateVoiceChip();playWord(p.name)};
+    row.appendChild(b);
+  });
+}
+$("#voiceChip").onclick=()=>showScreen("home");
+
+/* ===================== ことばをつくろう ===================== */
+function renderLevels(){const c=$("#levels");c.innerHTML="";LEVELS.forEach((lv,i)=>{const b=document.createElement("button");b.className="lv"+(i===level?" active":"");b.textContent=lv.name;b.onclick=()=>{level=i;resetSlots()};c.appendChild(b)})}
+function slotInner(role,card,active,readonly){
+  if(card)return `<span class="role">${ROLE_JP[role]}</span>${card.img?`<img src="${card.img}">`:`<span class="emoji">${card.e}</span>`}<span class="word">${card.w}</span>${readonly?"":'<button class="x">×</button>'}`;
+  return `<span class="role">${ROLE_JP[role]}</span><span class="hint">${active?"👇 えらんでね":"・・・"}</span>`;
+}
+function renderSlots(){
+  const wrap=$("#slots");wrap.innerHTML="";
+  const roles=LEVELS[level].slots, active=filled.findIndex(c=>!c);
+  roles.forEach((role,i)=>{
+    const card=filled[i],d=document.createElement("div");
+    d.className="slot"+(card?" filled":"")+(i===active?" active":"");
+    d.innerHTML=slotInner(role,card,i===active,false);
+    if(card){d.querySelector(".x").onclick=e=>{e.stopPropagation();filled[i]=null;onSlotsChange()};d.onclick=()=>playWord(card.w)}
+    wrap.appendChild(d);
+  });
+}
+function renderPalette(){
+  const active=filled.findIndex(c=>!c);
+  const role=active>=0?LEVELS[level].slots[active]:null;
+  $("#catLabel").textContent=role?`「${ROLE_JP[role]}」のカードを えらぼう`:"ぜんぶ そろったよ！🔊 よむ をおしてね";
+  const pal=$("#palette");pal.innerHTML="";if(!role)return;
+  cardsFor(role).forEach(card=>{const b=document.createElement("div");b.className="pcard";b.innerHTML=`${card.img?`<img src="${card.img}">`:`<span class="emoji">${card.e}</span>`}<span class="word">${card.w}</span>`;b.onclick=()=>{playWord(card.w);filled[active]=card;onSlotsChange()};pal.appendChild(b)});
+}
+function updateActions(){const complete=filled.length>0&&filled.every(c=>c);$("#readBtn").disabled=!complete;$("#recBtn").disabled=!complete;$("#clearBtn").disabled=filled.every(c=>!c);$("#playBtn").disabled=!lastRecURL}
+function onSlotsChange(){renderSlots();renderPalette();updateActions()}
+function resetSlots(){filled=LEVELS[level].slots.map(()=>null);lastRecURL=null;renderLevels();renderSlots();renderPalette();updateActions()}
+$("#readBtn").onclick=async()=>{if(!filled.every(c=>c))return;await playPhrase(filled.map(c=>c.w),LEVELS[level].slots);celebrate()};
+$("#clearBtn").onclick=resetSlots;
+$("#recBtn").onclick=()=>toggleSelfRec($("#recBtn"),()=>{updateActions()},filled.map(c=>c.w));
+$("#playBtn").onclick=()=>playSelf();
+
+/* ===================== お祝い ===================== */
+function celebrate(txt){
+  const el=$("#celebrate");if(txt)el.querySelector(".txt").textContent=txt;el.classList.add("show");
+  for(let i=0;i<18;i++){const c=document.createElement("div");c.className="confetti";c.textContent=["⭐","🎈","✨","🌟","🎉"][i%5];c.style.left=Math.random()*100+"vw";c.style.animationDuration=(1+Math.random()*1.2)+"s";document.body.appendChild(c);setTimeout(()=>c.remove(),2200)}
+  setStars(getStars()+1);bumpToday();
+  setTimeout(()=>el.classList.remove("show"),1500);
+}
+
+/* ===================== 子どもの録音（自分の声）＋ 認識 ===================== */
+function toggleSelfRec(btn,done,targetWords){
+  if(mediaRec&&mediaRec.state==="recording"){if(mediaRec)mediaRec.stop();if(recog)try{recog.stop()}catch(e){}return}
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    recChunks=[];mediaRec=new MediaRecorder(stream);
+    mediaRec.ondataavailable=e=>recChunks.push(e.data);
+    mediaRec.onstop=()=>{const blob=new Blob(recChunks,{type:'audio/webm'});if(lastRecURL)URL.revokeObjectURL(lastRecURL);lastRecURL=URL.createObjectURL(blob);stream.getTracks().forEach(t=>t.stop());btn.classList.remove("on");btn.innerHTML=btn.dataset.lbl;done&&done()};
+    mediaRec.start();btn.dataset.lbl=btn.innerHTML;btn.classList.add("on");btn.innerHTML="⏹ とめる";
+    if(targetWords)startRecog(targetWords);
+  }).catch(()=>toast("マイクが つかえません"));
+}
+function playSelf(){if(lastRecURL){const a=new Audio(lastRecURL);a.play()}}
+function startRecog(targetWords){
+  if(!recogSupported)return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recog=new SR();recog.lang="ja-JP";recog.interimResults=false;recog.maxAlternatives=3;
+  recog.onresult=ev=>{let said="";for(const r of ev.results)said+=r[0].transcript;checkMatch(said,targetWords)};
+  recog.onerror=()=>{};try{recog.start()}catch(e){}
+}
+const norm=s=>(s||"").replace(/[、。\s　ー]/g,"");
+function checkMatch(said,targetWords){
+  const heard=norm(said);
+  if(targetWords.every(w=>heard.includes(norm(w)))){setTimeout(()=>{toast("じょうずに いえたね！💮");tts("じょうず！")},300)}
+}
+
+/* ===================== まねっこ ===================== */
+let maneIdx=0;
+function loadMane(i){
+  maneIdx=(i+MANE.length)%MANE.length;
+  const m=MANE[maneIdx];lastRecURL=null;$("#manePlay").disabled=true;
+  const wrap=$("#maneSlots");wrap.innerHTML="";
+  m.words.forEach((w,k)=>{const card=findCard(w),d=document.createElement("div");d.className="slot filled ro";d.innerHTML=slotInner(m.roles[k],card,false,true);d.onclick=()=>playWord(w);wrap.appendChild(d)});
+  $("#maneText").textContent="「"+joinSentence(m.words,m.roles)+"」";
+  setTimeout(()=>playPhrase(m.words,m.roles),250);
+}
+$("#maneListen").onclick=()=>{const m=MANE[maneIdx];playPhrase(m.words,m.roles)};
+$("#maneRec").onclick=()=>toggleSelfRec($("#maneRec"),()=>{$("#manePlay").disabled=!lastRecURL;celebrate("まねっこ じょうず！")},MANE[maneIdx].words);
+$("#manePlay").onclick=playSelf;
+$("#maneNext").onclick=()=>loadMane(maneIdx+1);
+
+/* ===================== しつもんあそび ===================== */
+let quizIdx=0;
+function loadQuiz(i){
+  quizIdx=(i+QUIZ.length)%QUIZ.length;
+  const q=QUIZ[quizIdx];
+  $("#quizQ").textContent=q.qText;
+  $("#quizA").style.display="none";$("#quizNext").style.display="none";
+  const opt=$("#quizOptions");opt.innerHTML="";opt.style.display="grid";
+  q.options.forEach(w=>{const c=findCard(w),b=document.createElement("div");b.className="pcard";b.innerHTML=`<span class="emoji">${c.img?"":c.e}</span>${c.img?`<img src="${c.img}">`:""}<span class="word">${c.w}</span>`;b.onclick=()=>answerQuiz(w);opt.appendChild(b)});
+  setTimeout(()=>tts(q.qText),250);
+}
+async function answerQuiz(w){
+  const q=QUIZ[quizIdx];
+  const sentence=joinSentence([w,q.verb],[q.role,"verb"]);
+  $("#quizOptions").style.display="none";
+  const a=$("#quizA");a.style.display="block";a.textContent="そう！ "+sentence+" ね 😊";
+  // 答えを家族/きかい声で：主体/対象＋どうする
+  await playPhrase([w,q.verb],[q.role,"verb"]);
+  await tts("そう！ "+sentence+"ね");
+  setStars(getStars()+1);bumpToday();
+  $("#quizNext").style.display="block";
+}
+$("#quizListen").onclick=()=>tts(QUIZ[quizIdx].qText);
+$("#quizNext").onclick=()=>loadQuiz(quizIdx+1);
+
+/* ===================== おとなモード ===================== */
+let pressT=null;
+$("#gear").addEventListener("pointerdown",()=>{pressT=setTimeout(openGate,800)});
+["pointerup","pointerleave","pointercancel"].forEach(ev=>$("#gear").addEventListener(ev,()=>clearTimeout(pressT)));
+function openGate(){
+  const panel=$("#adminPanel");
+  panel.innerHTML=`<h2>おとなのかた かくにん</h2><p class="hidenote" style="text-align:center">⭐を 3かい タップ</p><div class="gate" id="gate"><button>⭐</button><button>⭐</button><button>⭐</button></div>`;
+  let n=0;panel.querySelectorAll("#gate button").forEach(b=>b.onclick=()=>{if(++n>=3)openAdmin()});
+  $("#admin").classList.add("show");
+}
+function openAdmin(){
+  const t=getToday(),panel=$("#adminPanel");
+  panel.innerHTML=`
+    <h2>⚙️ おとなモード</h2>
+    <div class="row"><label>おとを ならす</label><button class="switch ${settings.sound?'on':''}" id="swSound"></button></div>
+    <div class="row"><label>きかい声の はやさ</label><input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="${settings.rate}"></div>
+    <div class="row"><label>きかい声</label><select id="voiceSel"></select></div>
+
+    <h3>🎙 かぞくの こえ</h3>
+    <div class="row"><label>こえを えらぶ</label><select id="profSel"></select></div>
+    <div style="display:flex;gap:8px"><button class="btn sky" id="newProf" style="margin-top:0">＋ あたらしい こえ</button><button class="btn danger" id="delProf" style="margin-top:0;width:auto">けす</button></div>
+    <p class="hidenote" id="recHint" style="margin:8px 2px"></p>
+    <div class="vlist" id="vlist"></div>
+
+    <h3>🃏 しゃしんカード</h3>
+    <button class="btn sky" id="addPhoto">📷 しゃしんカードを ついか</button>
+
+    <div class="hidenote" style="text-align:left;margin:10px 0">いままで ⭐${getStars()}こ ／ きょう ${t.n}こ</div>
+    <button class="btn danger" id="resetStars">⭐を 0に もどす</button>
+    <button class="btn close" id="closeAdmin">とじる</button>
+    <input type="file" id="photoFile" accept="image/*" capture="environment" style="display:none">`;
+
+  $("#swSound").onclick=function(){settings.sound=!settings.sound;this.classList.toggle("on");save("kotoba_settings",settings)};
+  $("#rate").oninput=e=>{settings.rate=+e.target.value;save("kotoba_settings",settings)};
+  const vs=$("#voiceSel");vs.innerHTML="";voices.forEach(v=>{const o=document.createElement("option");o.value=v.name;o.textContent=v.name;if(v.name===settings.voice)o.selected=true;vs.appendChild(o)});if(!voices.length)vs.innerHTML="<option>（じどう）</option>";
+  vs.onchange=e=>{settings.voice=e.target.value;save("kotoba_settings",settings)};
+
+  // 声プロファイル
+  let editPid = profiles.find(p=>p.id!=="tts")?.id || "tts";
+  const ps=$("#profSel");
+  function fillProfSel(){ps.innerHTML="";profiles.forEach(p=>{const o=document.createElement("option");o.value=p.id;o.textContent=p.emoji+" "+p.name;if(p.id===editPid)o.selected=true;ps.appendChild(o)})}
+  fillProfSel();
+  ps.onchange=e=>{editPid=e.target.value;renderVList()};
+  $("#newProf").onclick=()=>newProfile(()=>{editPid=profiles[profiles.length-1].id;fillProfSel();renderVList()});
+  $("#delProf").onclick=async()=>{
+    if(editPid==="tts"){toast("きかい声は けせません");return}
+    const p=profiles.find(x=>x.id===editPid);
+    if(!confirm(`「${p.name}」の こえを けしますか？`))return;
+    for(const w of allVocab().map(v=>v.w)){await DB.del(vkey(editPid,w))}
+    profiles=profiles.filter(x=>x.id!==editPid);save("kotoba_profiles",profiles);
+    if(activeVoice===editPid){activeVoice="tts";localStorage.setItem("kotoba_activeVoice","tts")}
+    await refreshKeys();editPid=profiles[0].id;fillProfSel();renderVList();renderVoiceRow();updateVoiceChip();
+  };
+  function renderVList(){
+    const box=$("#vlist"),hint=$("#recHint");box.innerHTML="";
+    if(editPid==="tts"){hint.textContent="「きかい声」は ろくおん ふよう（じどうで よみます）。ほかの こえを えらぶか ＋であたらしく つくってね。";box.innerHTML="";return}
+    hint.textContent="ことばの 🎤 をおして 1つずつ ろくおん。✓は ろくおん ずみ。▶で かくにん。";
+    allVocab().forEach(v=>{
+      const has=audioKeys.has(vkey(editPid,v.w));
+      const it=document.createElement("div");it.className="vitem";
+      it.innerHTML=`<span class="em">${v.img?'<img src="'+v.img+'" style="width:24px;height:24px;border-radius:6px;object-fit:cover">':v.e}</span><span class="w">${v.w}</span><span class="mark">${has?"✅":"…"}</span>`;
+      const recB=document.createElement("button");recB.textContent="🎤";recB.className=has?"has":"";
+      recB.onclick=()=>recordWord(editPid,v.w,recB,()=>renderVList());
+      const playB=document.createElement("button");playB.textContent="▶";playB.disabled=!has;
+      playB.onclick=async()=>{const b=await DB.get(vkey(editPid,v.w));if(b)playBlob(b)};
+      it.appendChild(recB);it.appendChild(playB);box.appendChild(it);
+    });
+  }
+  renderVList();
+
+  // 写真カード
+  let pendingRole="object";
+  $("#addPhoto").onclick=()=>{const r=prompt("どの なかま？\nだれ=1  なに=2  どうする=3  どんな=4","2");pendingRole={"1":"agent","2":"object","3":"verb","4":"adj"}[r]||"object";$("#photoFile").click()};
+  $("#photoFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const img=new Image(),fr=new FileReader();fr.onload=()=>{img.onload=()=>{const cv=document.createElement("canvas"),S=160,s=Math.min(img.width,img.height);cv.width=cv.height=S;cv.getContext("2d").drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,S,S);const w=prompt("ことば（ひらがな）");if(!w)return;custom[pendingRole].push({w,img:cv.toDataURL("image/jpeg",0.8)});save("kotoba_custom",custom);toast("カードを ついかしたよ");renderVList()}; img.src=fr.result};fr.readAsDataURL(f)};
+
+  $("#resetStars").onclick=()=>{if(confirm("⭐を 0に もどしますか？")){setStars(0);save("kotoba_today",{date:new Date().toISOString().slice(0,10),n:0})}};
+  $("#closeAdmin").onclick=()=>$("#admin").classList.remove("show");
+}
+$("#admin").onclick=e=>{if(e.target.id==="admin")$("#admin").classList.remove("show")};
+
+function newProfile(done){
+  const panel=$("#adminPanel");
+  const faces=["👩","👨","👵","👴","🧑","👧","👦","🧓","👩‍🦰","🧔"];
+  panel.insertAdjacentHTML("afterbegin",`<div id="npWrap" style="background:#f6faf8;border-radius:14px;padding:12px;margin-bottom:10px">
+    <h3 style="margin-top:0">あたらしい こえ</h3>
+    <input id="npName" placeholder="なまえ（おかあさん など）" style="width:100%;padding:10px;border-radius:10px;border:2px solid #eef3f0;font-size:16px">
+    <div class="pemoji" id="npEmoji">${faces.map((f,i)=>`<button class="${i===0?'sel':''}" data-e="${f}">${f}</button>`).join("")}</div>
+    <div style="display:flex;gap:8px"><button class="btn sky" id="npOk" style="margin-top:0">つくる</button><button class="btn" id="npCancel" style="margin-top:0;background:#eef3f0">やめる</button></div>
+  </div>`);
+  let emoji=faces[0];
+  panel.querySelectorAll("#npEmoji button").forEach(b=>b.onclick=()=>{emoji=b.dataset.e;panel.querySelectorAll("#npEmoji button").forEach(x=>x.classList.remove("sel"));b.classList.add("sel")});
+  $("#npCancel").onclick=()=>$("#npWrap").remove();
+  $("#npOk").onclick=()=>{const name=($("#npName").value||"").trim()||"かぞく";profiles.push({id:"v_"+Date.now(),name,emoji});save("kotoba_profiles",profiles);$("#npWrap").remove();renderVoiceRow();toast("こえを つくったよ。ことばを ろくおんしてね");done&&done()};
+}
+
+/* 1単語ずつ録音（おとなモード用） */
+function recordWord(pid,word,btn,done){
+  if(mediaRec&&mediaRec.state==="recording"){mediaRec.stop();return}
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    recChunks=[];mediaRec=new MediaRecorder(stream);
+    mediaRec.ondataavailable=e=>recChunks.push(e.data);
+    mediaRec.onstop=async()=>{const blob=new Blob(recChunks,{type:'audio/webm'});stream.getTracks().forEach(t=>t.stop());btn.classList.remove("recing");await DB.put(vkey(pid,word),blob);await refreshKeys();done&&done()};
+    mediaRec.start();btn.classList.add("recing");
+    // しゃべる時間：タップで止める or 4秒で自動
+    setTimeout(()=>{if(mediaRec&&mediaRec.state==="recording")mediaRec.stop()},4000);
+  }).catch(()=>toast("マイクが つかえません"));
+}
+
+/* ===================== トースト ===================== */
+let toastT=null;
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),2000)}
+
+/* ===================== 初期化 ===================== */
+(async function init(){
+  $("#stars").textContent=getStars();
+  await refreshKeys();
+  renderVoiceRow();updateVoiceChip();
+  showScreen("home");
+})();
+</script>
+</body>
+</html>

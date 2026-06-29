@@ -1,0 +1,17 @@
+{
+  "name": "ことばれんしゅう",
+  "short_name": "ことばれんしゅう",
+  "description": "2語文から会話へ。絵カードを並べて文を作り、家族の声でことばを楽しく練習する言語訓練アプリ。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f7f4",
+  "theme_color": "#7bc4a4",
+  "lang": "ja",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
