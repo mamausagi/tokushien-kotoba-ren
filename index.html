@@ -340,9 +340,27 @@ function silentWavURI(){
   let bin="";for(let i=0;i<bytes;i++)bin+=String.fromCharCode(buf[i]);
   return "data:audio/wav;base64,"+btoa(bin);
 }
+// WebAudioのビープ（TTSが鳴らない端末でも「音が出せるか」を確認できる・ごほうび音にも使う）
+let actx=null;
+function getCtx(){if(!actx){const C=window.AudioContext||window.webkitAudioContext;if(C){try{actx=new C()}catch(e){}}}return actx}
+function beep(freq=880,dur=0.18,type="sine"){
+  const c=getCtx();if(!c)return;
+  if(c.state==="suspended"){try{c.resume()}catch(e){}}
+  try{const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.value=freq;
+    o.connect(g);g.connect(c.destination);
+    g.gain.setValueAtTime(0.0001,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.28,c.currentTime+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+dur);
+    o.start();o.stop(c.currentTime+dur+0.03);
+  }catch(e){}
+}
+function chime(){if(!settings.sound)return;beep(660,0.12);setTimeout(()=>beep(990,0.16),120)}
 function unlockAudio(){
   if(audioUnlocked)return;
   audioUnlocked=true;   // 1回のジェスチャーで解除。以後は再試行せず＝再生中の音を妨げない
+  try{const c=getCtx();if(c&&c.state==="suspended")c.resume()}catch(e){}
+  // iOS の speechSynthesis を「温める」（最初の無音発話をジェスチャー内で）
+  try{if('speechSynthesis' in window){const w=new SpeechSynthesisUtterance(" ");w.volume=0;speechSynthesis.speak(w)}}catch(e){}
   try{player.muted=true;player.src=silentWavURI();const p=player.play();
     const fin=()=>{player.pause();try{player.currentTime=0}catch(e){}player.muted=false};
     if(p&&p.then)p.then(fin).catch(()=>{player.muted=false}); else fin();
@@ -432,6 +450,7 @@ $("#playBtn").onclick=()=>playSelf();
 
 /* ===================== お祝い ===================== */
 function celebrate(txt){
+  chime();
   const el=$("#celebrate");if(txt)el.querySelector(".txt").textContent=txt;el.classList.add("show");
   for(let i=0;i<18;i++){const c=document.createElement("div");c.className="confetti";c.textContent=["⭐","🎈","✨","🌟","🎉"][i%5];c.style.left=Math.random()*100+"vw";c.style.animationDuration=(1+Math.random()*1.2)+"s";document.body.appendChild(c);setTimeout(()=>c.remove(),2200)}
   setStars(getStars()+1);bumpToday();
@@ -542,6 +561,7 @@ function openAdmin(){
   const t=getToday(),panel=$("#adminPanel");
   panel.innerHTML=`
     <h2>⚙️ おとなモード</h2>
+    <div class="row"><label>おとの テスト<br><span class="hidenote">音が出るか かくにん</span></label><button class="btn sky" id="soundTest" style="width:auto;margin-top:0">🔊 テスト</button></div>
     <div class="row"><label>おとを ならす</label><button class="switch ${settings.sound?'on':''}" id="swSound"></button></div>
     <div class="row"><label>こえを ききとって ほめる<br><span class="hidenote">iPhone/iPad では ふあんてい・録音と競合します。Android向け（既定オフ）</span></label><button class="switch ${settings.recognize?'on':''}" id="swRecog"></button></div>
     <div class="row"><label>きかい声の はやさ</label><input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="${settings.rate}"></div>
@@ -563,6 +583,23 @@ function openAdmin(){
 
   $("#swSound").onclick=function(){settings.sound=!settings.sound;this.classList.toggle("on");save("kotoba_settings",settings)};
   $("#swRecog").onclick=function(){settings.recognize=!settings.recognize;this.classList.toggle("on");save("kotoba_settings",settings)};
+  $("#soundTest").onclick=function(){
+    unlockAudio(); beep(880,0.18); setTimeout(()=>beep(1320,0.2),200);
+    let spoke=false; if('speechSynthesis' in window){const u=new SpeechSynthesisUtterance("おとの てすと");u.lang="ja-JP";u.rate=settings.rate;u.onstart=()=>spoke=true;try{speechSynthesis.speak(u)}catch(e){}}
+    const standalone=(window.navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+    setTimeout(()=>alert(
+      "🔊 おとテスト\n\n"+
+      "①「ピッ・ピッ」と鳴った？ → 端末の音はOK\n"+
+      "②「おとのてすと」と声がした？ → きかい声OK\n\n"+
+      "── しんだん ──\n"+
+      "音量/消音: 鳴らないなら本体の音量・消音を確認\n"+
+      "音声合成API: "+('speechSynthesis' in window?'あり':'なし')+"\n"+
+      "日本語の声: "+voices.length+"こ\n"+
+      "声が出た(onstart): "+(spoke?'はい':'いいえ')+"\n"+
+      "ホーム画面起動: "+(standalone?'はい(※iOSはこの時きかい声が出ない事あり→Safariのタブで試す)':'いいえ(Safariタブ)')+"\n"+
+      "録音解除: "+(audioUnlocked?'済':'未')
+    ),1400);
+  };
   $("#rate").oninput=e=>{settings.rate=+e.target.value;save("kotoba_settings",settings)};
   const vs=$("#voiceSel");vs.innerHTML="";voices.forEach(v=>{const o=document.createElement("option");o.value=v.name;o.textContent=v.name;if(v.name===settings.voice)o.selected=true;vs.appendChild(o)});if(!voices.length)vs.innerHTML="<option>（じどう）</option>";
   vs.onchange=e=>{settings.voice=e.target.value;save("kotoba_settings",settings)};
